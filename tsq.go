@@ -1,15 +1,21 @@
 package tsq
 
+import (
+	"time"
+)
+
 type Runner interface {
 	Run(args interface{}) (interface{}, error)
 }
 
 type Job struct {
-	UUID   string      `json:"uuid"`
-	Name   string      `json:"name"`
-	Status string      `json:"status"`
+	UUID      string      `json:"uuid"`
+	Name      string      `json:"name"`
+	Status    string      `json:"status"`
 	Arguments interface{} `json:"arguments"`
-	Result interface{} `json:"result"`
+	Result    interface{} `json:"result"`
+	Created   time.Time   `json:"created"`
+	Updated   time.Time   `json:"updated"`
 }
 
 const (

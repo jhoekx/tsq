@@ -6,7 +6,7 @@ import (
 )
 
 type CommandTask struct {
-	Cmd string
+	Cmd  string
 	Args []string
 }
 

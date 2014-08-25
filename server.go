@@ -80,15 +80,15 @@ func (s *Server) listDefinedTasks(w http.ResponseWriter, r *http.Request) (data 
 
 func (s *Server) submitTask(w http.ResponseWriter, r *http.Request) (data interface{}, err error) {
 	name := mux.Vars(r)["name"]
-	
+
 	var arguments interface{}
 	if r.Header.Get("Content-Type") == "application/json" && r.ContentLength != 0 {
-        err = json.NewDecoder(r.Body).Decode(&arguments)
-        if err != nil {
-            return
-        }
-    }
-	
+		err = json.NewDecoder(r.Body).Decode(&arguments)
+		if err != nil {
+			return
+		}
+	}
+
 	job, err := s.TaskQueue.Submit(name, arguments)
 	if err != nil {
 		err = &httpError{404, err}

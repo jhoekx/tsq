@@ -3,6 +3,7 @@ package tsq
 import (
 	"errors"
 	"sync"
+	"time"
 )
 
 type TaskQueue struct {
@@ -23,7 +24,8 @@ func (q *TaskQueue) Submit(name string, arguments interface{}) (job *Job, err er
 	}
 
 	if _, ok := q.Tasks[name]; ok {
-		job = &Job{Name: name, UUID: uuid, Status: JOB_PENDING, Arguments: arguments}
+		now := time.Now()
+		job = &Job{Name: name, UUID: uuid, Status: JOB_PENDING, Arguments: arguments, Created: now, Updated: now}
 		q.add(job)
 		q.jobQueue <- job
 		return
@@ -59,15 +61,20 @@ func (q *TaskQueue) Start() {
 }
 
 func (q *TaskQueue) run(job *Job) {
-	job.Status = JOB_RUNNING
+	job.SetStatus(JOB_RUNNING)
 	result, err := q.Tasks[job.Name].Run(job.Arguments)
 	job.Result = result
 	if err != nil {
-        if result == nil {
-            job.Result = err.Error()
-        }
-		job.Status = JOB_FAILURE
+		if result == nil {
+			job.Result = err.Error()
+		}
+		job.SetStatus(JOB_FAILURE)
 		return
 	}
-	job.Status = JOB_SUCCESS
+	job.SetStatus(JOB_SUCCESS)
+}
+
+func (job *Job) SetStatus(status string) {
+	job.Status = status
+	job.Updated = time.Now()
 }
