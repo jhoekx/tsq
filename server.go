@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"time"
 )
 
 type Server struct {
@@ -21,6 +22,8 @@ func New() (server *Server) {
 	queue.Tasks = make(map[string]Runner)
 	queue.jobQueue = make(chan *Job, 10)
 	queue.Jobs = make([]*Job, 0, 10)
+	queue.CleanInterval = time.Duration(24) * time.Hour
+	queue.MaxAge = time.Duration(7*24) * time.Hour
 	server.TaskQueue = queue
 
 	return

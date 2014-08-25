@@ -7,10 +7,12 @@ import (
 )
 
 type TaskQueue struct {
-	Tasks    map[string]Runner
-	jobQueue chan *Job
-	jobMutex sync.Mutex
-	Jobs     []*Job
+	Tasks         map[string]Runner
+	jobQueue      chan *Job
+	jobMutex      sync.Mutex
+	Jobs          []*Job
+	CleanInterval time.Duration
+	MaxAge        time.Duration
 }
 
 func (q *TaskQueue) Define(name string, r Runner) {
@@ -58,6 +60,13 @@ func (q *TaskQueue) Start() {
 			q.run(job)
 		}
 	}()
+
+	go func() {
+		for {
+			time.Sleep(q.CleanInterval * time.Second)
+			q.clean()
+		}
+	}()
 }
 
 func (q *TaskQueue) run(job *Job) {
@@ -77,4 +86,17 @@ func (q *TaskQueue) run(job *Job) {
 func (job *Job) SetStatus(status string) {
 	job.Status = status
 	job.Updated = time.Now()
+}
+
+func (q *TaskQueue) clean() {
+	q.jobMutex.Lock()
+	newList := make([]*Job, 0, len(q.Jobs))
+	limit := time.Now().Add(-q.MaxAge * time.Second)
+	for _, job := range q.Jobs {
+		if job.Updated.After(limit) {
+			newList = append(newList, job)
+		}
+	}
+	q.Jobs = newList
+	q.jobMutex.Unlock()
 }
