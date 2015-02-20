@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-import "tsq"
+import "github.com/jhoekx/tsq"
 
 type SleepTask struct{}
 

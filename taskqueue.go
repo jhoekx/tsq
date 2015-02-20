@@ -62,8 +62,11 @@ func (q *TaskQueue) Start() {
 	}()
 
 	go func() {
+		if q.CleanInterval <= 0 {
+			panic("Incorrect cleaning interval")
+		}
 		for {
-			time.Sleep(q.CleanInterval * time.Second)
+			time.Sleep(q.CleanInterval)
 			q.clean()
 		}
 	}()
