@@ -94,7 +94,7 @@ func (job *Job) SetStatus(status string) {
 func (q *TaskQueue) clean() {
 	q.jobMutex.Lock()
 	newList := make([]*Job, 0, len(q.Jobs))
-	limit := time.Now().Add(-q.MaxAge * time.Second)
+	limit := time.Now().Add(-q.MaxAge)
 	for _, job := range q.Jobs {
 		if job.Updated.After(limit) {
 			newList = append(newList, job)
