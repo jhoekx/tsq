@@ -43,7 +43,7 @@ func (s *Server) Start() {
 	s.Router.HandleFunc("/jobs/{uuid}/", jsonResponse(s.getJobStatus)).Name("job")
 
 	http.Handle("/", s.Router)
-	log.Fatalln(http.ListenAndServe(":8080", nil))
+	log.Fatalln(http.ListenAndServe(":8000", nil))
 }
 
 type NameRef struct {
