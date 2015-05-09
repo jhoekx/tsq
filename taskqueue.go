@@ -7,16 +7,42 @@ import (
 )
 
 type TaskQueue struct {
-	Tasks         map[string]Runner
+	tasks         map[string]Runner
 	jobQueue      chan *Job
 	jobMutex      sync.Mutex
-	Jobs          []*Job
+	jobs          []*Job
+	cleanInterval time.Duration
+	maxAge        time.Duration
+}
+
+type Config struct {
+	QueueLength   int
 	CleanInterval time.Duration
 	MaxAge        time.Duration
 }
 
+func (config *Config) NewQueue() (q *TaskQueue) {
+	q = &TaskQueue{}
+	q.tasks = make(map[string]Runner)
+	q.jobQueue = make(chan *Job, config.QueueLength)
+	q.jobs = make([]*Job, 0, 10)
+	q.cleanInterval = config.CleanInterval
+	q.maxAge = config.MaxAge
+	return
+}
+
+var DefaultConfig Config = Config{
+	QueueLength:   10,
+	CleanInterval: time.Duration(24) * time.Hour,
+	MaxAge:        time.Duration(7*24) * time.Hour,
+}
+
+func New() *TaskQueue {
+	return DefaultConfig.NewQueue()
+}
+
 func (q *TaskQueue) Define(name string, r Runner) {
-	q.Tasks[name] = r
+	q.tasks[name] = r
 }
 
 func (q *TaskQueue) Submit(name string, arguments interface{}) (job *Job, err error) {
@@ -25,9 +51,16 @@ func (q *TaskQueue) Submit(name string, arguments interface{}) (job *Job, err er
 		return
 	}
 
-	if _, ok := q.Tasks[name]; ok {
+	if _, ok := q.tasks[name]; ok {
 		now := time.Now()
-		job = &Job{Name: name, UUID: uuid, Status: JOB_PENDING, Arguments: arguments, Created: now, Updated: now}
+		job = &Job{
+			Name:      name,
+			UUID:      uuid,
+			Status:    JOB_PENDING,
+			Arguments: arguments,
+			Created:   now,
+			Updated:   now,
+		}
 		q.add(job)
 		q.jobQueue <- job
 		return
@@ -38,13 +71,13 @@ func (q *TaskQueue) Submit(name string, arguments interface{}) (job *Job, err er
 
 func (q *TaskQueue) add(job *Job) {
 	q.jobMutex.Lock()
-	q.Jobs = append(q.Jobs, job)
+	q.jobs = append(q.jobs, job)
 	q.jobMutex.Unlock()
 	return
 }
 
 func (q *TaskQueue) GetJob(uuid string) (job *Job, err error) {
-	for _, job := range q.Jobs {
+	for _, job := range q.jobs {
 		if job.UUID == uuid {
 			return job, err
 		}
@@ -62,11 +95,11 @@ func (q *TaskQueue) Start() {
 	}()
 
 	go func() {
-		if q.CleanInterval <= 0 {
+		if q.cleanInterval <= 0 {
 			panic("Incorrect cleaning interval")
 		}
 		for {
-			time.Sleep(q.CleanInterval)
+			time.Sleep(q.cleanInterval)
 			q.clean()
 		}
 	}()
@@ -74,7 +107,7 @@ func (q *TaskQueue) Start() {
 
 func (q *TaskQueue) run(job *Job) {
 	job.SetStatus(JOB_RUNNING)
-	result, err := q.Tasks[job.Name].Run(job.Arguments)
+	result, err := q.tasks[job.Name].Run(job.Arguments)
 	job.Result = result
 	if err != nil {
 		if result == nil {
@@ -93,13 +126,13 @@ func (job *Job) SetStatus(status string) {
 
 func (q *TaskQueue) clean() {
 	q.jobMutex.Lock()
-	newList := make([]*Job, 0, len(q.Jobs))
-	limit := time.Now().Add(-q.MaxAge)
-	for _, job := range q.Jobs {
+	newList := make([]*Job, 0, len(q.jobs))
+	limit := time.Now().Add(-q.maxAge)
+	for _, job := range q.jobs {
 		if job.Updated.After(limit) {
 			newList = append(newList, job)
 		}
 	}
-	q.Jobs = newList
+	q.jobs = newList
 	q.jobMutex.Unlock()
 }

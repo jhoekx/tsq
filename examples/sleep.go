@@ -7,7 +7,10 @@ import (
 	"time"
 )
 
-import "github.com/jhoekx/tsq"
+import (
+	"github.com/jhoekx/tsq"
+	"net/http"
+)
 
 type SleepTask struct{}
 
@@ -31,24 +34,34 @@ func (t *SleepTask) Run(arguments interface{}) (data interface{}, err error) {
 	return
 }
 
-func main() {
-	server := tsq.New()
+func logRequests(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Println(r.Method, r.URL)
+		next.ServeHTTP(w, r)
+	})
+}
 
-	server.Define("sleep", &SleepTask{})
+func main() {
+	q := tsq.New()
+
+	q.Define("sleep", &SleepTask{})
 
 	cmd := tsq.CommandTask{"sleep", []string{"5"}}
-	server.Define("sleep-5", &cmd)
+	q.Define("sleep-5", &cmd)
 
 	echo := tsq.CommandTask{"echo", []string{"pong"}}
-	server.Define("ping", &echo)
+	q.Define("ping", &echo)
 
 	fail := tsq.CommandTask{"false", []string{""}}
-	server.Define("fail", &fail)
+	q.Define("fail", &fail)
 
-	_, err := server.TaskQueue.Submit("sleep-5", nil)
+	_, err := q.Submit("sleep-5", nil)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	server.Start()
+	q.Start()
+
+	http.Handle("/tsq/", logRequests(tsq.ServeQueue("/tsq/", q)))
+	log.Fatalln(http.ListenAndServe(":8000", nil))
 }

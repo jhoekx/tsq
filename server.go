@@ -3,47 +3,31 @@ package tsq
 import (
 	"encoding/json"
 	"github.com/gorilla/mux"
-	"log"
 	"net/http"
 	"strconv"
-	"time"
 )
 
-type Server struct {
-	TaskQueue *TaskQueue
-	Router    *mux.Router
+type server struct {
+	taskQueue *TaskQueue
+	router    *mux.Router
 }
 
-func New() (server *Server) {
-	server = &Server{}
-	server.Router = mux.NewRouter()
+func ServeQueue(baseURL string, q *TaskQueue) http.Handler {
+	svr := &server{
+		router:    mux.NewRouter().Path(baseURL).Subrouter(),
+		taskQueue: q,
+	}
+	svr.registerRoutes()
 
-	queue := &TaskQueue{}
-	queue.Tasks = make(map[string]Runner)
-	queue.jobQueue = make(chan *Job, 10)
-	queue.Jobs = make([]*Job, 0, 10)
-	queue.CleanInterval = time.Duration(24) * time.Hour
-	queue.MaxAge = time.Duration(7*24) * time.Hour
-	server.TaskQueue = queue
-
-	return
+	return svr.router
 }
 
-func (s *Server) Define(name string, r Runner) {
-	s.TaskQueue.Define(name, r)
-}
-
-func (s *Server) Start() {
-	s.TaskQueue.Start()
-
-	s.Router.HandleFunc("/", jsonResponse(s.listServices))
-	s.Router.HandleFunc("/tasks/", jsonResponse(s.listDefinedTasks)).Name("tasks")
-	s.Router.HandleFunc("/tasks/{name}/", jsonResponse(s.submitTask)).Methods("POST").Name("submitTask")
-	s.Router.HandleFunc("/jobs/", jsonResponse(s.listJobs)).Name("jobs")
-	s.Router.HandleFunc("/jobs/{uuid}/", jsonResponse(s.getJobStatus)).Name("job")
-
-	http.Handle("/", s.Router)
-	log.Fatalln(http.ListenAndServe(":8000", nil))
+func (s *server) registerRoutes() {
+	s.router.HandleFunc("/", jsonResponse(s.listServices))
+	s.router.HandleFunc("/tasks/", jsonResponse(s.listDefinedTasks)).Name("tasks")
+	s.router.HandleFunc("/tasks/{name}/", jsonResponse(s.submitTask)).Methods("POST").Name("submitTask")
+	s.router.HandleFunc("/jobs/", jsonResponse(s.listJobs)).Name("jobs")
+	s.router.HandleFunc("/jobs/{uuid}/", jsonResponse(s.getJobStatus)).Name("job")
 }
 
 type NameRef struct {
@@ -51,12 +35,12 @@ type NameRef struct {
 	Href string `json:"href"`
 }
 
-func (s *Server) listServices(w http.ResponseWriter, r *http.Request) (data interface{}, err error) {
-	tasksUrl, err := s.Router.Get("tasks").URL()
+func (s *server) listServices(w http.ResponseWriter, r *http.Request) (data interface{}, err error) {
+	tasksUrl, err := s.router.Get("tasks").URL()
 	if err != nil {
 		return
 	}
-	jobsUrl, err := s.Router.Get("jobs").URL()
+	jobsUrl, err := s.router.Get("jobs").URL()
 	if err != nil {
 		return
 	}
@@ -68,10 +52,10 @@ func (s *Server) listServices(w http.ResponseWriter, r *http.Request) (data inte
 	return
 }
 
-func (s *Server) listDefinedTasks(w http.ResponseWriter, r *http.Request) (data interface{}, err error) {
-	tasks := make([]NameRef, 0, len(s.TaskQueue.Tasks))
-	for key := range s.TaskQueue.Tasks {
-		taskUrl, err := s.Router.Get("submitTask").URL("name", key)
+func (s *server) listDefinedTasks(w http.ResponseWriter, r *http.Request) (data interface{}, err error) {
+	tasks := make([]NameRef, 0, len(s.taskQueue.tasks))
+	for key := range s.taskQueue.tasks {
+		taskUrl, err := s.router.Get("submitTask").URL("name", key)
 		if err != nil {
 			return tasks, err
 		}
@@ -81,7 +65,7 @@ func (s *Server) listDefinedTasks(w http.ResponseWriter, r *http.Request) (data 
 	return
 }
 
-func (s *Server) submitTask(w http.ResponseWriter, r *http.Request) (data interface{}, err error) {
+func (s *server) submitTask(w http.ResponseWriter, r *http.Request) (data interface{}, err error) {
 	name := mux.Vars(r)["name"]
 
 	var arguments interface{}
@@ -92,12 +76,12 @@ func (s *Server) submitTask(w http.ResponseWriter, r *http.Request) (data interf
 		}
 	}
 
-	job, err := s.TaskQueue.Submit(name, arguments)
+	job, err := s.taskQueue.Submit(name, arguments)
 	if err != nil {
 		err = &httpError{404, err}
 		return
 	}
-	url, err := s.Router.Get("job").URL("uuid", job.UUID)
+	url, err := s.router.Get("job").URL("uuid", job.UUID)
 	data = WebJob{job, url.String()}
 	return
 }
@@ -107,10 +91,10 @@ type WebJob struct {
 	Href string `json:"href"`
 }
 
-func (s *Server) listJobs(w http.ResponseWriter, r *http.Request) (data interface{}, err error) {
-	jobs := make([]interface{}, 0, len(s.TaskQueue.Jobs))
-	for _, job := range s.TaskQueue.Jobs {
-		url, err := s.Router.Get("job").URL("uuid", job.UUID)
+func (s *server) listJobs(w http.ResponseWriter, r *http.Request) (data interface{}, err error) {
+	jobs := make([]interface{}, 0, len(s.taskQueue.jobs))
+	for _, job := range s.taskQueue.jobs {
+		url, err := s.router.Get("job").URL("uuid", job.UUID)
 		if err != nil {
 			return data, err
 		}
@@ -120,15 +104,15 @@ func (s *Server) listJobs(w http.ResponseWriter, r *http.Request) (data interfac
 	return
 }
 
-func (s *Server) getJobStatus(w http.ResponseWriter, r *http.Request) (data interface{}, err error) {
+func (s *server) getJobStatus(w http.ResponseWriter, r *http.Request) (data interface{}, err error) {
 	uuid := mux.Vars(r)["uuid"]
-	job, err := s.TaskQueue.GetJob(uuid)
+	job, err := s.taskQueue.GetJob(uuid)
 	if err != nil {
 		err = &httpError{404, err}
 		return
 	}
 
-	url, err := s.Router.Get("job").URL("uuid", job.UUID)
+	url, err := s.router.Get("job").URL("uuid", job.UUID)
 	if err != nil {
 		return data, err
 	}
@@ -149,6 +133,7 @@ type httpHandler func(http.ResponseWriter, *http.Request) (interface{}, error)
 
 func jsonResponse(fn httpHandler) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
+		var err error
 		data, err := fn(w, r)
 		if e, ok := err.(*httpError); ok {
 			http.Error(w, e.Error(), e.Status)
