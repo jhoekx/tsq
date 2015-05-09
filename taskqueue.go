@@ -106,22 +106,26 @@ func (q *TaskQueue) Start() {
 }
 
 func (q *TaskQueue) run(job *Job) {
-	job.SetStatus(JOB_RUNNING)
+	job.setStatus(JOB_RUNNING)
 	result, err := q.tasks[job.Name].Run(job.Arguments)
 	job.Result = result
 	if err != nil {
 		if result == nil {
 			job.Result = err.Error()
 		}
-		job.SetStatus(JOB_FAILURE)
+		job.setStatus(JOB_FAILURE)
 		return
 	}
-	job.SetStatus(JOB_SUCCESS)
+	job.setStatus(JOB_SUCCESS)
 }
 
-func (job *Job) SetStatus(status string) {
+func (job *Job) setStatus(status string) {
 	job.Status = status
 	job.Updated = time.Now()
+}
+
+func (job *Job) HasFinished() bool {
+	return job.Status == JOB_SUCCESS || job.Status == JOB_FAILURE
 }
 
 func (q *TaskQueue) clean() {
@@ -129,7 +133,7 @@ func (q *TaskQueue) clean() {
 	newList := make([]*Job, 0, len(q.jobs))
 	limit := time.Now().Add(-q.maxAge)
 	for _, job := range q.jobs {
-		if job.Updated.After(limit) {
+		if !job.HasFinished() || job.Updated.After(limit) {
 			newList = append(newList, job)
 		}
 	}
