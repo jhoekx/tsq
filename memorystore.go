@@ -3,30 +3,43 @@ package tsq
 import (
 	"errors"
 	"sync"
+	"time"
 )
 
-type MemoryStore struct {
+type CleanedMemoryStore struct {
 	jobMutex sync.Mutex
 	jobs     []*Job
+	cleaner  *Cleaner
 }
 
-func NewMemoryStore() JobStore {
-	store := &MemoryStore{}
+func NewCleanedMemoryStore(cleanInterval time.Duration, maxAge time.Duration) JobStore {
+	store := &CleanedMemoryStore{}
 	store.jobs = make([]*Job, 0, 10)
+	cleanStrategy := &TimeBasedCleanStrategy{MaxAge: maxAge}
+	store.cleaner = NewCleaner(store, cleanInterval, cleanStrategy)
 	return store
 }
 
-func (s *MemoryStore) Store(job *Job) {
+func (s *CleanedMemoryStore) Start() (err error) {
+	err = s.cleaner.Start()
+	return
+}
+
+func (s *CleanedMemoryStore) Stop() {
+	s.cleaner.Stop()
+}
+
+func (s *CleanedMemoryStore) Store(job *Job) {
 	s.jobMutex.Lock()
 	s.jobs = append(s.jobs, job)
 	s.jobMutex.Unlock()
 }
 
-func (s *MemoryStore) GetJobs() (jobs []*Job) {
+func (s *CleanedMemoryStore) GetJobs() (jobs []*Job) {
 	return s.jobs
 }
 
-func (s *MemoryStore) GetJob(uuid string) (job *Job, err error) {
+func (s *CleanedMemoryStore) GetJob(uuid string) (job *Job, err error) {
 	for _, job := range s.jobs {
 		if job.UUID == uuid {
 			return job, err
@@ -36,7 +49,7 @@ func (s *MemoryStore) GetJob(uuid string) (job *Job, err error) {
 	return
 }
 
-func (s *MemoryStore) Clean(cleaner CleanStrategy) {
+func (s *CleanedMemoryStore) Clean(cleaner CleanStrategy) {
 	s.jobMutex.Lock()
 	defer s.jobMutex.Unlock()
 	newList := make([]*Job, 0, len(s.jobs))

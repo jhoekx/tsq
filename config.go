@@ -3,19 +3,16 @@ package tsq
 import "time"
 
 type Config struct {
-	QueueLength   int
-	JobStore      JobStore
-	CleanInterval time.Duration
-	CleanStrategy CleanStrategy
+	QueueLength int
+	JobStore    JobStore
 }
 
 func (config *Config) NewQueue() (q *TaskQueue) {
 	q = &TaskQueue{
-		tasks:         make(map[string]Runner),
-		jobQueue:      make(chan *Job, config.QueueLength),
-		jobStore:      config.getJobStore(),
-		cleanInterval: config.CleanInterval,
-		cleaner:       config.getCleanStrategy(),
+		stopQueue: make(chan bool, 1),
+		tasks:     make(map[string]Runner),
+		jobQueue:  make(chan *Job, config.getQueueLength()),
+		jobStore:  config.getJobStore(),
 	}
 	return
 }
@@ -29,18 +26,16 @@ func (config *Config) getJobStore() (store JobStore) {
 	return
 }
 
-func (config *Config) getCleanStrategy() (cleaner CleanStrategy) {
-	if config.CleanStrategy != nil {
-		cleaner = config.CleanStrategy
+func (config *Config) getQueueLength() (queueLength int) {
+	if config.QueueLength > 0 {
+		queueLength = config.QueueLength
 	} else {
-		cleaner = DefaultConfig.CleanStrategy
+		queueLength = DefaultConfig.QueueLength
 	}
 	return
 }
 
 var DefaultConfig Config = Config{
-	QueueLength:   10,
-	JobStore:      NewMemoryStore(),
-	CleanInterval: time.Duration(24) * time.Hour,
-	CleanStrategy: &TimeBasedCleanStrategy{time.Duration(7*24) * time.Hour},
+	QueueLength: 10,
+	JobStore:    NewCleanedMemoryStore(time.Duration(24)*time.Hour, time.Duration(7*24)*time.Hour),
 }

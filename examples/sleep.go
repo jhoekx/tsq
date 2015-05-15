@@ -4,12 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"time"
-)
-
-import (
-	"github.com/jhoekx/tsq"
 	"net/http"
+	"time"
+
+	"github.com/jhoekx/tsq"
 )
 
 type SleepTask struct{}
@@ -42,7 +40,12 @@ func logRequests(next http.Handler) http.Handler {
 }
 
 func main() {
-	q := tsq.New()
+	cleanInterval := 1 * time.Minute
+	maxAge := 2 * time.Minute
+	qConfig := tsq.Config{
+		JobStore: tsq.NewCleanedMemoryStore(cleanInterval, maxAge),
+	}
+	q := qConfig.NewQueue()
 
 	q.Define("sleep", &SleepTask{})
 

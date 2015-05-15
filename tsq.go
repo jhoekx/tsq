@@ -25,13 +25,14 @@ const (
 	JOB_FAILURE = "FAILURE"
 )
 
+type LifeCycle interface {
+	Start() error
+	Stop()
+}
+
 type JobStore interface {
+	LifeCycle
 	Store(job *Job)
 	GetJob(uuid string) (*Job, error)
 	GetJobs() []*Job
-	Clean(cleaner CleanStrategy)
-}
-
-type CleanStrategy interface {
-	ShouldKeep(job *Job) bool
 }

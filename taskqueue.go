@@ -6,11 +6,10 @@ import (
 )
 
 type TaskQueue struct {
-	tasks         map[string]Runner
-	jobQueue      chan *Job
-	jobStore      JobStore
-	cleanInterval time.Duration
-	cleaner       CleanStrategy
+	stopQueue chan bool
+	tasks     map[string]Runner
+	jobQueue  chan *Job
+	jobStore  JobStore
 }
 
 func New() *TaskQueue {
@@ -53,23 +52,25 @@ func (q *TaskQueue) GetJob(uuid string) (job *Job, err error) {
 	return q.jobStore.GetJob(uuid)
 }
 
-func (q *TaskQueue) Start() {
+func (q *TaskQueue) Start() (err error) {
+	q.jobStore.Start()
 	go func() {
 		for {
-			job := <-q.jobQueue
-			q.run(job)
-		}
-	}()
+			select {
+			case job := <-q.jobQueue:
+				q.run(job)
+			case <-q.stopQueue:
+				return
+			}
 
-	go func() {
-		if q.cleanInterval <= 0 {
-			panic("Incorrect cleaning interval")
-		}
-		for {
-			time.Sleep(q.cleanInterval)
-			q.clean()
 		}
 	}()
+	return
+}
+
+func (q *TaskQueue) Stop() {
+	q.jobStore.Stop()
+	q.stopQueue <- true
 }
 
 func (q *TaskQueue) run(job *Job) {
@@ -93,17 +94,4 @@ func (job *Job) setStatus(status string) {
 
 func (job *Job) HasFinished() bool {
 	return job.Status == JOB_SUCCESS || job.Status == JOB_FAILURE
-}
-
-func (q *TaskQueue) clean() {
-	q.jobStore.Clean(q.cleaner)
-}
-
-type TimeBasedCleanStrategy struct {
-	maxAge time.Duration
-}
-
-func (s *TimeBasedCleanStrategy) ShouldKeep(job *Job) bool {
-	limit := time.Now().Add(-s.maxAge)
-	return job.Updated.After(limit)
 }

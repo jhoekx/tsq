@@ -68,7 +68,8 @@ func NewTestQueue() (tsq *TaskQueue) {
 }
 
 func NewTestQueueWithMaxAge(maxAge time.Duration) (tsq *TaskQueue) {
-	config := Config{CleanInterval: 24 * time.Hour, CleanStrategy: &TimeBasedCleanStrategy{maxAge: maxAge}}
+	store := NewCleanedMemoryStore(24*time.Hour, maxAge)
+	config := Config{JobStore: store}
 	tsq = config.NewQueue()
 	tsk := &TestTask{}
 	tsq.Define("test", tsk)
@@ -168,7 +169,8 @@ func TestRemoveOldJobs(t *testing.T) {
 	run := NewTestRun()
 	job, _ := tsq.Submit("test", run)
 	run.WaitForFinish(t)
-	tsq.clean()
+	store := tsq.jobStore.(*CleanedMemoryStore)
+	store.cleaner.Clean()
 	_, err := tsq.GetJob(job.UUID)
 	if err == nil {
 		t.Fail()
@@ -181,7 +183,8 @@ func TestOnlyRemoveCompletedJobs(t *testing.T) {
 	run.shouldWait = true
 	job, _ := tsq.Submit("test", run)
 	run.WaitForStart(t)
-	tsq.clean()
+	store := tsq.jobStore.(*CleanedMemoryStore)
+	store.cleaner.Clean()
 	res, _ := tsq.GetJob(job.UUID)
 	if res != job {
 		t.Fail()
@@ -199,7 +202,8 @@ func TestOnlyRemoveOldJobs(t *testing.T) {
 	oldRun.WaitForFinish(t)
 	recentJob.Updated = time.Now().Add(-30 * time.Minute)
 	oldJob.Updated = time.Now().Add(-2 * time.Hour)
-	tsq.clean()
+	store := tsq.jobStore.(*CleanedMemoryStore)
+	store.cleaner.Clean()
 	res, _ := tsq.GetJob(recentJob.UUID)
 	if res != recentJob {
 		t.Fail()
