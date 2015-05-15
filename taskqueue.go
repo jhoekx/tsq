@@ -2,39 +2,15 @@ package tsq
 
 import (
 	"errors"
-	"sync"
 	"time"
 )
 
 type TaskQueue struct {
 	tasks         map[string]Runner
 	jobQueue      chan *Job
-	jobMutex      sync.Mutex
-	jobs          []*Job
+	jobStore      JobStore
 	cleanInterval time.Duration
-	maxAge        time.Duration
-}
-
-type Config struct {
-	QueueLength   int
-	CleanInterval time.Duration
-	MaxAge        time.Duration
-}
-
-func (config *Config) NewQueue() (q *TaskQueue) {
-	q = &TaskQueue{}
-	q.tasks = make(map[string]Runner)
-	q.jobQueue = make(chan *Job, config.QueueLength)
-	q.jobs = make([]*Job, 0, 10)
-	q.cleanInterval = config.CleanInterval
-	q.maxAge = config.MaxAge
-	return
-}
-
-var DefaultConfig Config = Config{
-	QueueLength:   10,
-	CleanInterval: time.Duration(24) * time.Hour,
-	MaxAge:        time.Duration(7*24) * time.Hour,
+	cleaner       CleanStrategy
 }
 
 func New() *TaskQueue {
@@ -61,7 +37,7 @@ func (q *TaskQueue) Submit(name string, arguments interface{}) (job *Job, err er
 			Created:   now,
 			Updated:   now,
 		}
-		q.add(job)
+		q.jobStore.Store(job)
 		q.jobQueue <- job
 		return
 	}
@@ -69,21 +45,12 @@ func (q *TaskQueue) Submit(name string, arguments interface{}) (job *Job, err er
 	return
 }
 
-func (q *TaskQueue) add(job *Job) {
-	q.jobMutex.Lock()
-	q.jobs = append(q.jobs, job)
-	q.jobMutex.Unlock()
-	return
+func (q *TaskQueue) GetJobs() (jobs []*Job) {
+	return q.jobStore.GetJobs()
 }
 
 func (q *TaskQueue) GetJob(uuid string) (job *Job, err error) {
-	for _, job := range q.jobs {
-		if job.UUID == uuid {
-			return job, err
-		}
-	}
-	err = errors.New("Job " + uuid + " not found")
-	return
+	return q.jobStore.GetJob(uuid)
 }
 
 func (q *TaskQueue) Start() {
@@ -129,14 +96,14 @@ func (job *Job) HasFinished() bool {
 }
 
 func (q *TaskQueue) clean() {
-	q.jobMutex.Lock()
-	newList := make([]*Job, 0, len(q.jobs))
-	limit := time.Now().Add(-q.maxAge)
-	for _, job := range q.jobs {
-		if !job.HasFinished() || job.Updated.After(limit) {
-			newList = append(newList, job)
-		}
-	}
-	q.jobs = newList
-	q.jobMutex.Unlock()
+	q.jobStore.Clean(q.cleaner)
+}
+
+type TimeBasedCleanStrategy struct {
+	maxAge time.Duration
+}
+
+func (s *TimeBasedCleanStrategy) ShouldKeep(job *Job) bool {
+	limit := time.Now().Add(-s.maxAge)
+	return job.Updated.After(limit)
 }

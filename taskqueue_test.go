@@ -67,6 +67,15 @@ func NewTestQueue() (tsq *TaskQueue) {
 	return
 }
 
+func NewTestQueueWithMaxAge(maxAge time.Duration) (tsq *TaskQueue) {
+	config := Config{CleanInterval: 24 * time.Hour, CleanStrategy: &TimeBasedCleanStrategy{maxAge: maxAge}}
+	tsq = config.NewQueue()
+	tsk := &TestTask{}
+	tsq.Define("test", tsk)
+	tsq.Start()
+	return
+}
+
 func TestUndefinedTask(t *testing.T) {
 	tsq := NewTestQueue()
 	_, err := tsq.Submit("notest", make([]interface{}, 1))
@@ -155,8 +164,7 @@ func TestGetUnknownJob(t *testing.T) {
 }
 
 func TestRemoveOldJobs(t *testing.T) {
-	tsq := NewTestQueue()
-	tsq.maxAge = 0
+	tsq := NewTestQueueWithMaxAge(0)
 	run := NewTestRun()
 	job, _ := tsq.Submit("test", run)
 	run.WaitForFinish(t)
@@ -168,8 +176,7 @@ func TestRemoveOldJobs(t *testing.T) {
 }
 
 func TestOnlyRemoveCompletedJobs(t *testing.T) {
-	tsq := NewTestQueue()
-	tsq.maxAge = 0
+	tsq := NewTestQueueWithMaxAge(0)
 	run := NewTestRun()
 	run.shouldWait = true
 	job, _ := tsq.Submit("test", run)
@@ -184,8 +191,7 @@ func TestOnlyRemoveCompletedJobs(t *testing.T) {
 }
 
 func TestOnlyRemoveOldJobs(t *testing.T) {
-	tsq := NewTestQueue()
-	tsq.maxAge = 1 * time.Hour
+	tsq := NewTestQueueWithMaxAge(1 * time.Hour)
 	recentRun := NewTestRun()
 	oldRun := NewTestRun()
 	recentJob, _ := tsq.Submit("test", recentRun)

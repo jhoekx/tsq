@@ -24,3 +24,14 @@ const (
 	JOB_SUCCESS = "SUCCESS"
 	JOB_FAILURE = "FAILURE"
 )
+
+type JobStore interface {
+	Store(job *Job)
+	GetJob(uuid string) (*Job, error)
+	GetJobs() []*Job
+	Clean(cleaner CleanStrategy)
+}
+
+type CleanStrategy interface {
+	ShouldKeep(job *Job) bool
+}
