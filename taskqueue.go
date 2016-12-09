@@ -26,21 +26,22 @@ func (q *TaskQueue) Submit(name string, arguments interface{}) (job *Job, err er
 		return
 	}
 
-	if _, ok := q.tasks[name]; ok {
-		now := time.Now()
-		job = &Job{
-			Name:      name,
-			UUID:      uuid,
-			Status:    JOB_PENDING,
-			Arguments: arguments,
-			Created:   now,
-			Updated:   now,
-		}
-		q.jobStore.Store(job)
-		q.jobQueue <- job
+	if _, ok := q.tasks[name]; !ok {
+		err = errors.New("Unknown task: " + name)
 		return
 	}
-	err = errors.New("Unknown task: " + name)
+
+	now := time.Now()
+	job = &Job{
+		Name:      name,
+		UUID:      uuid,
+		Status:    JOB_PENDING,
+		Arguments: arguments,
+		Created:   now,
+		Updated:   now,
+	}
+	q.jobStore.Store(job)
+	q.jobQueue <- job
 	return
 }
 

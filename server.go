@@ -45,8 +45,8 @@ func (s *server) listServices(w http.ResponseWriter, r *http.Request) (data inte
 		return
 	}
 	services := []NameRef{
-		NameRef{"tasks", tasksUrl.String()},
-		NameRef{"jobs", jobsUrl.String()},
+		{"tasks", tasksUrl.String()},
+		{"jobs", jobsUrl.String()},
 	}
 	data = services
 	return
@@ -144,11 +144,14 @@ func jsonResponse(fn httpHandler) func(http.ResponseWriter, *http.Request) {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		err = json.NewEncoder(w).Encode(data)
-		if err != nil {
-			http.Error(w, err.Error(), 500)
-		}
-		return
+		renderJSON(w, data)
+	}
+}
+
+func renderJSON(w http.ResponseWriter, data interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	err := json.NewEncoder(w).Encode(data)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
 	}
 }
