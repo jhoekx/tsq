@@ -49,6 +49,25 @@ func (s *CleanedMemoryStore) GetJob(uuid string) (job *Job, err error) {
 	return
 }
 
+func (s *CleanedMemoryStore) SetStatus(uuid string, status string) (err error) {
+	job, err := s.GetJob(uuid)
+	if err != nil {
+		return
+	}
+	job.Status = status
+	job.Updated = time.Now()
+	return
+}
+
+func (s *CleanedMemoryStore) SetResult(uuid string, result interface{}) (err error) {
+	job, err := s.GetJob(uuid)
+	if err != nil {
+		return
+	}
+	job.Result = result
+	return
+}
+
 func (s *CleanedMemoryStore) Clean(cleaner CleanStrategy) {
 	s.jobMutex.Lock()
 	defer s.jobMutex.Unlock()

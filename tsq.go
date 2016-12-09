@@ -34,5 +34,7 @@ type JobStore interface {
 	LifeCycle
 	Store(job *Job)
 	GetJob(uuid string) (*Job, error)
+	SetStatus(uuid string, status string) error
+	SetResult(uuid string, result interface{}) error
 	GetJobs() []*Job
 }

@@ -45,16 +45,19 @@ func (q *TaskQueue) Submit(name string, arguments interface{}) (job *Job, err er
 	return
 }
 
-func (q *TaskQueue) GetJobs() (jobs []*Job) {
+func (q *TaskQueue) GetJobs() []*Job {
 	return q.jobStore.GetJobs()
 }
 
-func (q *TaskQueue) GetJob(uuid string) (job *Job, err error) {
+func (q *TaskQueue) GetJob(uuid string) (*Job, error) {
 	return q.jobStore.GetJob(uuid)
 }
 
 func (q *TaskQueue) Start() (err error) {
-	q.jobStore.Start()
+	err = q.jobStore.Start()
+	if err != nil {
+		return
+	}
 	go func() {
 		for {
 			select {
@@ -75,22 +78,17 @@ func (q *TaskQueue) Stop() {
 }
 
 func (q *TaskQueue) run(job *Job) {
-	job.setStatus(JOB_RUNNING)
+	q.jobStore.SetStatus(job.UUID, JOB_RUNNING)
 	result, err := q.tasks[job.Name].Run(job.Arguments)
-	job.Result = result
+	q.jobStore.SetResult(job.UUID, result)
 	if err != nil {
 		if result == nil {
-			job.Result = err.Error()
+			q.jobStore.SetResult(job.UUID, err.Error())
 		}
-		job.setStatus(JOB_FAILURE)
+		q.jobStore.SetStatus(job.UUID, JOB_FAILURE)
 		return
 	}
-	job.setStatus(JOB_SUCCESS)
-}
-
-func (job *Job) setStatus(status string) {
-	job.Status = status
-	job.Updated = time.Now()
+	q.jobStore.SetStatus(job.UUID, JOB_SUCCESS)
 }
 
 func (job *Job) HasFinished() bool {
