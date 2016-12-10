@@ -45,8 +45,9 @@ func (q *TaskQueue) Submit(name string, arguments interface{}) (job *Job, err er
 	return
 }
 
-func (q *TaskQueue) GetJobs() []*Job {
-	return q.jobStore.GetJobs()
+func (q *TaskQueue) GetJobs() (jobs []*Job, err error) {
+	jobs, err = q.jobStore.GetJobs()
+	return
 }
 
 func (q *TaskQueue) GetJob(uuid string) (*Job, error) {
@@ -78,17 +79,17 @@ func (q *TaskQueue) Stop() {
 }
 
 func (q *TaskQueue) run(job *Job) {
-	q.jobStore.SetStatus(job.UUID, JOB_RUNNING)
+	q.jobStore.SetStatus(job.UUID, JOB_RUNNING, time.Now())
 	result, err := q.tasks[job.Name].Run(job.Arguments)
 	q.jobStore.SetResult(job.UUID, result)
 	if err != nil {
 		if result == nil {
 			q.jobStore.SetResult(job.UUID, err.Error())
 		}
-		q.jobStore.SetStatus(job.UUID, JOB_FAILURE)
+		q.jobStore.SetStatus(job.UUID, JOB_FAILURE, time.Now())
 		return
 	}
-	q.jobStore.SetStatus(job.UUID, JOB_SUCCESS)
+	q.jobStore.SetStatus(job.UUID, JOB_SUCCESS, time.Now())
 }
 
 func (job *Job) HasFinished() bool {

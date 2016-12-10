@@ -29,14 +29,15 @@ func (s *CleanedMemoryStore) Stop() {
 	s.cleaner.Stop()
 }
 
-func (s *CleanedMemoryStore) Store(job *Job) {
+func (s *CleanedMemoryStore) Store(job *Job) error {
 	s.jobMutex.Lock()
 	s.jobs = append(s.jobs, job)
 	s.jobMutex.Unlock()
+	return nil
 }
 
-func (s *CleanedMemoryStore) GetJobs() (jobs []*Job) {
-	return s.jobs
+func (s *CleanedMemoryStore) GetJobs() ([]*Job, error) {
+	return s.jobs, nil
 }
 
 func (s *CleanedMemoryStore) GetJob(uuid string) (job *Job, err error) {
@@ -49,13 +50,13 @@ func (s *CleanedMemoryStore) GetJob(uuid string) (job *Job, err error) {
 	return
 }
 
-func (s *CleanedMemoryStore) SetStatus(uuid string, status string) (err error) {
+func (s *CleanedMemoryStore) SetStatus(uuid string, status string, updated time.Time) (err error) {
 	job, err := s.GetJob(uuid)
 	if err != nil {
 		return
 	}
 	job.Status = status
-	job.Updated = time.Now()
+	job.Updated = updated
 	return
 }
 

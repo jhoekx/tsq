@@ -92,8 +92,12 @@ type WebJob struct {
 }
 
 func (s *server) listJobs(w http.ResponseWriter, r *http.Request) (data interface{}, err error) {
-	jobs := make([]interface{}, 0, len(s.taskQueue.jobStore.GetJobs()))
-	for _, job := range s.taskQueue.jobStore.GetJobs() {
+	storedJobs, err := s.taskQueue.jobStore.GetJobs()
+	if err != nil {
+		return
+	}
+	jobs := make([]interface{}, 0, len(storedJobs))
+	for _, job := range storedJobs {
 		url, err := s.router.Get("job").URL("uuid", job.UUID)
 		if err != nil {
 			return data, err

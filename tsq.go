@@ -32,9 +32,9 @@ type LifeCycle interface {
 
 type JobStore interface {
 	LifeCycle
-	Store(job *Job)
+	Store(job *Job) error
 	GetJob(uuid string) (*Job, error)
-	SetStatus(uuid string, status string) error
+	SetStatus(uuid string, status string, updated time.Time) error
 	SetResult(uuid string, result interface{}) error
-	GetJobs() []*Job
+	GetJobs() ([]*Job, error)
 }
