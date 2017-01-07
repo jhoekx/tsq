@@ -67,16 +67,6 @@ func NewTestQueue() (tsq *TaskQueue) {
 	return
 }
 
-func NewTestQueueWithMaxAge(maxAge time.Duration) (tsq *TaskQueue) {
-	store := NewCleanedMemoryStore(24*time.Hour, maxAge)
-	config := Config{JobStore: store}
-	tsq = config.NewQueue()
-	tsk := &TestTask{}
-	tsq.Define("test", tsk)
-	tsq.Start()
-	return
-}
-
 func TestUndefinedTask(t *testing.T) {
 	tsq := NewTestQueue()
 	_, err := tsq.Submit("notest", make([]interface{}, 1))
@@ -160,56 +150,6 @@ func TestGetUnknownJob(t *testing.T) {
 	run.WaitForFinish(t)
 	_, err := tsq.GetJob("foo")
 	if err.Error() != "Job foo not found" {
-		t.Fail()
-	}
-}
-
-func TestRemoveOldJobs(t *testing.T) {
-	tsq := NewTestQueueWithMaxAge(0)
-	run := NewTestRun()
-	job, _ := tsq.Submit("test", run)
-	run.WaitForFinish(t)
-	store := tsq.jobStore.(*CleanedMemoryStore)
-	store.cleaner.Clean()
-	_, err := tsq.GetJob(job.UUID)
-	if err == nil {
-		t.Fail()
-	}
-}
-
-func TestOnlyRemoveCompletedJobs(t *testing.T) {
-	tsq := NewTestQueueWithMaxAge(0)
-	run := NewTestRun()
-	run.shouldWait = true
-	job, _ := tsq.Submit("test", run)
-	run.WaitForStart(t)
-	store := tsq.jobStore.(*CleanedMemoryStore)
-	store.cleaner.Clean()
-	res, _ := tsq.GetJob(job.UUID)
-	if res != job {
-		t.Fail()
-	}
-	run.forward <- true
-	run.WaitForFinish(t)
-}
-
-func TestOnlyRemoveOldJobs(t *testing.T) {
-	tsq := NewTestQueueWithMaxAge(1 * time.Hour)
-	recentRun := NewTestRun()
-	oldRun := NewTestRun()
-	recentJob, _ := tsq.Submit("test", recentRun)
-	oldJob, _ := tsq.Submit("test", oldRun)
-	oldRun.WaitForFinish(t)
-	recentJob.Updated = time.Now().Add(-30 * time.Minute)
-	oldJob.Updated = time.Now().Add(-2 * time.Hour)
-	store := tsq.jobStore.(*CleanedMemoryStore)
-	store.cleaner.Clean()
-	res, _ := tsq.GetJob(recentJob.UUID)
-	if res != recentJob {
-		t.Fail()
-	}
-	_, err := tsq.GetJob(oldJob.UUID)
-	if err == nil {
 		t.Fail()
 	}
 }

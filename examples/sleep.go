@@ -40,12 +40,7 @@ func logRequests(next http.Handler) http.Handler {
 }
 
 func main() {
-	cleanInterval := 1 * time.Minute
-	maxAge := 2 * time.Minute
-	qConfig := tsq.Config{
-		JobStore: tsq.NewCleanedMemoryStore(cleanInterval, maxAge),
-	}
-	q := qConfig.NewQueue()
+	q := tsq.New()
 
 	q.Define("sleep", &SleepTask{})
 

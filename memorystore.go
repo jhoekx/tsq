@@ -6,41 +6,36 @@ import (
 	"time"
 )
 
-type CleanedMemoryStore struct {
+type MemoryStore struct {
 	jobMutex sync.Mutex
 	jobs     []*Job
-	cleaner  *Cleaner
 }
 
-func NewCleanedMemoryStore(cleanInterval time.Duration, maxAge time.Duration) JobStore {
-	store := &CleanedMemoryStore{}
+func NewMemoryStore() JobStore {
+	store := &MemoryStore{}
 	store.jobs = make([]*Job, 0, 10)
-	cleanStrategy := &TimeBasedCleanStrategy{MaxAge: maxAge}
-	store.cleaner = NewCleaner(store, cleanInterval, cleanStrategy)
 	return store
 }
 
-func (s *CleanedMemoryStore) Start() (err error) {
-	err = s.cleaner.Start()
+func (s *MemoryStore) Start() (err error) {
 	return
 }
 
-func (s *CleanedMemoryStore) Stop() {
-	s.cleaner.Stop()
+func (s *MemoryStore) Stop() {
 }
 
-func (s *CleanedMemoryStore) Store(job *Job) error {
+func (s *MemoryStore) Store(job *Job) error {
 	s.jobMutex.Lock()
 	s.jobs = append(s.jobs, job)
 	s.jobMutex.Unlock()
 	return nil
 }
 
-func (s *CleanedMemoryStore) GetJobs() ([]*Job, error) {
+func (s *MemoryStore) GetJobs() ([]*Job, error) {
 	return s.jobs, nil
 }
 
-func (s *CleanedMemoryStore) GetJob(uuid string) (job *Job, err error) {
+func (s *MemoryStore) GetJob(uuid string) (job *Job, err error) {
 	for _, job := range s.jobs {
 		if job.UUID == uuid {
 			return job, err
@@ -50,7 +45,7 @@ func (s *CleanedMemoryStore) GetJob(uuid string) (job *Job, err error) {
 	return
 }
 
-func (s *CleanedMemoryStore) SetStatus(uuid string, status string, updated time.Time) (err error) {
+func (s *MemoryStore) SetStatus(uuid string, status string, updated time.Time) (err error) {
 	job, err := s.GetJob(uuid)
 	if err != nil {
 		return
@@ -60,23 +55,11 @@ func (s *CleanedMemoryStore) SetStatus(uuid string, status string, updated time.
 	return
 }
 
-func (s *CleanedMemoryStore) SetResult(uuid string, result interface{}) (err error) {
+func (s *MemoryStore) SetResult(uuid string, result interface{}) (err error) {
 	job, err := s.GetJob(uuid)
 	if err != nil {
 		return
 	}
 	job.Result = result
 	return
-}
-
-func (s *CleanedMemoryStore) Clean(cleaner CleanStrategy) {
-	s.jobMutex.Lock()
-	defer s.jobMutex.Unlock()
-	newList := make([]*Job, 0, len(s.jobs))
-	for _, job := range s.jobs {
-		if !job.HasFinished() || cleaner.ShouldKeep(job) {
-			newList = append(newList, job)
-		}
-	}
-	s.jobs = newList
 }

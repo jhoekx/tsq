@@ -1,7 +1,5 @@
 package tsq
 
-import "time"
-
 type Config struct {
 	QueueLength int
 	JobStore    JobStore
@@ -37,5 +35,5 @@ func (config *Config) getQueueLength() (queueLength int) {
 
 var DefaultConfig Config = Config{
 	QueueLength: 10,
-	JobStore:    NewCleanedMemoryStore(time.Duration(24)*time.Hour, time.Duration(7*24)*time.Hour),
+	JobStore:    NewMemoryStore(),
 }
