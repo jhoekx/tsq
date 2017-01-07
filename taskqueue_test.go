@@ -61,10 +61,14 @@ func (job *TestRun) WaitForFinish(t *testing.T) {
 
 func NewTestQueue() (tsq *TaskQueue) {
 	tsq = New()
-	tsk := &TestTask{}
-	tsq.Define("test", tsk)
+	DefineTestTask(tsq)
 	tsq.Start()
 	return
+}
+
+func DefineTestTask(tsq *TaskQueue) {
+	tsk := &TestTask{}
+	tsq.Define("test", tsk)
 }
 
 func TestUndefinedTask(t *testing.T) {
@@ -150,6 +154,28 @@ func TestGetUnknownJob(t *testing.T) {
 	run.WaitForFinish(t)
 	_, err := tsq.GetJob("foo")
 	if err.Error() != "Job foo not found" {
+		t.Fail()
+	}
+}
+
+type FailStore struct {
+	JobStore
+}
+
+func (s FailStore) Store(job *Job) error {
+	return errors.New("ERROR")
+}
+
+func TestStoreFailure(t *testing.T) {
+	qConfig := Config{
+		JobStore: FailStore{NewMemoryStore()},
+	}
+	tsq := qConfig.NewQueue()
+	DefineTestTask(tsq)
+	tsq.Start()
+	run := NewTestRun()
+	_, err := tsq.Submit("test", run)
+	if err.Error() != "ERROR" {
 		t.Fail()
 	}
 }

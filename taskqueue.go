@@ -40,7 +40,10 @@ func (q *TaskQueue) Submit(name string, arguments interface{}) (job *Job, err er
 		Created:   now,
 		Updated:   now,
 	}
-	q.jobStore.Store(job)
+	err = q.jobStore.Store(job)
+	if err != nil {
+		return
+	}
 	q.jobQueue <- job
 	return
 }
