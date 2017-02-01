@@ -10,6 +10,13 @@ type CommandTask struct {
 	Args []string
 }
 
+func NewCommandTask(Cmd string, Args ...string) CommandTask {
+	return CommandTask{
+		Cmd:Cmd,
+		Args:Args,
+	}
+}
+
 func (t *CommandTask) Run(arguments interface{}) (data interface{}, err error) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
