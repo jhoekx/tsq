@@ -2,9 +2,12 @@ package tsq
 
 import (
 	"encoding/json"
-	"github.com/gorilla/mux"
+	"errors"
 	"net/http"
 	"strconv"
+	"time"
+
+	"github.com/gorilla/mux"
 )
 
 type server struct {
@@ -67,6 +70,10 @@ func (s *server) listDefinedTasks(w http.ResponseWriter, r *http.Request) (data 
 
 func (s *server) submitTask(w http.ResponseWriter, r *http.Request) (data interface{}, err error) {
 	name := mux.Vars(r)["name"]
+	timeout, err := getTimeout(r)
+	if err != nil {
+		return
+	}
 
 	var arguments interface{}
 	if r.Header.Get("Content-Type") == "application/json" && r.ContentLength != 0 {
@@ -81,6 +88,14 @@ func (s *server) submitTask(w http.ResponseWriter, r *http.Request) (data interf
 		err = &httpError{404, err}
 		return
 	}
+
+	if timeout > 0 {
+		job, err = waitForJob(s.taskQueue, job.UUID, time.Duration(timeout)*time.Second)
+		if err != nil {
+			return
+		}
+	}
+
 	url, err := s.router.Get("job").URL("uuid", job.UUID)
 	data = WebJob{job, url.String()}
 	return
@@ -157,5 +172,35 @@ func renderJSON(w http.ResponseWriter, data interface{}) {
 	err := json.NewEncoder(w).Encode(data)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
+	}
+}
+
+func getTimeout(r *http.Request) (timeout int, err error) {
+	timeoutParam := r.URL.Query().Get("jobTimeoutSeconds")
+	if len(timeoutParam) == 0 {
+		return
+	}
+	timeout, err = strconv.Atoi(timeoutParam)
+	return
+}
+
+func waitForJob(taskQueue *TaskQueue, uuid string, timeout time.Duration) (job *Job, err error) {
+	tick := time.Tick(500 * time.Millisecond)
+	stop := time.After(timeout)
+
+	for {
+		select {
+		case <-stop:
+			err = &httpError{504, errors.New("Timed out waiting for job " + job.UUID)}
+			return
+		case <-tick:
+			job, err = taskQueue.GetJob(uuid)
+			if err != nil {
+				return
+			}
+			if job.Status == JOB_SUCCESS || job.Status == JOB_FAILURE {
+				return
+			}
+		}
 	}
 }

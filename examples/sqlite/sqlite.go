@@ -26,6 +26,9 @@ func main() {
 	fail := tsq.CommandTask{"false", []string{""}}
 	q.Define("fail", &fail)
 
+	cmd := tsq.CommandTask{"sleep", []string{"5"}}
+	q.Define("sleep-5", &cmd)
+
 	q.Start()
 
 	http.Handle("/tsq/", logRequests(tsq.ServeQueue("/tsq/", q)))
