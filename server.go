@@ -3,6 +3,7 @@ package tsq
 import (
 	"encoding/json"
 	"errors"
+	"mime"
 	"net/http"
 	"strconv"
 	"time"
@@ -76,10 +77,16 @@ func (s *server) submitTask(w http.ResponseWriter, r *http.Request) (data interf
 	}
 
 	var arguments interface{}
-	if r.Header.Get("Content-Type") == "application/json" && r.ContentLength != 0 {
-		err = json.NewDecoder(r.Body).Decode(&arguments)
+	if r.Header.Get("Content-Type") != "" {
+		mt, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
 		if err != nil {
-			return
+			return nil, err
+		}
+		if mt == "application/json" && r.ContentLength != 0 {
+			err = json.NewDecoder(r.Body).Decode(&arguments)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
