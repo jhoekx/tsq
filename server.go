@@ -18,7 +18,7 @@ type server struct {
 
 func ServeQueue(baseURL string, q *TaskQueue) http.Handler {
 	svr := &server{
-		router:    mux.NewRouter().Path(baseURL).Subrouter(),
+		router:    mux.NewRouter().PathPrefix(baseURL).Subrouter(),
 		taskQueue: q,
 	}
 	svr.registerRoutes()
